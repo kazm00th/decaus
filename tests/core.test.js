@@ -218,7 +218,40 @@ test('曲線上のすべての点で Im f ≈ 0、頂点と頂点の間で y は
 
 // ---- 起きやすい入力（Review Focus）----
 
-test('臨界点が 1e-7 まで近づいても一般の場合のつながり方', () => {
+// x³ ∓ εx を s だけ平行移動した多項式の係数
+function shiftedCubic(eps, s) {
+  // (x − s)³ + eps·(x − s)
+  return [1, -3 * s, 3 * s * s + eps, -s * s * s - eps * s];
+}
+
+test('原点で臨界点どうしの距離が 4e-6〜4e-2 でも計算が通り、一般の場合のつながり方', () => {
+  for (let e = -11; e <= -3; e += 0.5) {
+    const eps = Math.pow(10, e);
+    const minus = D.compute(shiftedCubic(-eps, 0)); // 極値2つ
+    assert.ok(minus.check.ok, `ε=1e${e} (−): ${minus.check.message}`);
+    assert.deepEqual(imagEnds(minus), [[1, 5], [2, 4]], `ε=1e${e} (−)`);
+    const plus = D.compute(shiftedCubic(eps, 0)); // 極値なし
+    assert.ok(plus.check.ok, `ε=1e${e} (+): ${plus.check.message}`);
+    assert.deepEqual(imagEnds(plus), [[1, 2], [4, 5]], `ε=1e${e} (+)`);
+    assert.equal(plus.degenerate, false, `ε=1e${e} (+) を退化と誤認`);
+  }
+});
+
+test('x = 3 へ平行移動すると精度の限界で区別できない対は退化点として扱い、計算は通る', () => {
+  for (let e = -11; e <= -3; e += 0.5) {
+    const eps = Math.pow(10, e);
+    for (const [sign, generic] of [[-1, [[1, 5], [2, 4]]], [1, [[1, 2], [4, 5]]]]) {
+      const r = D.compute(shiftedCubic(sign * eps, 3));
+      const tag = `ε=1e${e} (${sign < 0 ? '−' : '+'})`;
+      assert.ok(r.check.ok, tag + ': ' + r.check.message);
+      assert.deepEqual(imagEnds(r), r.degenerate ? [[1, 4], [2, 5]] : generic, tag);
+    }
+  }
+  // 臨界点の距離が 0.02 以上なら退化点とはみなさない
+  assert.equal(D.compute(shiftedCubic(-1e-4, 3)).degenerate, false);
+});
+
+test('臨界点の距離 3.65e-4（x³ − 1e-7·x）でも一般の場合のつながり方', () => {
   const r = D.compute([1, 0, -1e-7, 0]);
   assert.ok(r.check.ok, r.check.message);
   assert.deepEqual(imagEnds(r), [[1, 5], [2, 4]]);

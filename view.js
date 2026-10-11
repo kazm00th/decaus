@@ -49,8 +49,13 @@
   // ---- 計算と表示範囲 ----
   function recompute() {
     try {
-      state.result = Decaus.compute(state.coeffs);
-      state.error = '';
+      const res = Decaus.compute(state.coeffs);
+      if (!res.check.ok && state.result && state.result.check.ok) {
+        state.error = '検算に失敗：' + res.check.message; // 直前の図（と表示範囲）は残す
+      } else {
+        state.result = res;
+        state.error = '';
+      }
     } catch (e) {
       state.error = e.message; // 直前の図は残す
     }

@@ -40,6 +40,14 @@
     for (let i = 0; i < p.length; i++) s = s * r + Math.abs(p[i]);
     return s;
   }
+  // p(z) を Horner 法で求めたときの丸め誤差の目安：8ε·Σ|a_i|·|z|^(n−i)
+  // （normAt と違い |z| < 1 で過大にならない。小さな値の近くでも曲線を正しく決められる）
+  function roundoffAt(p, z) {
+    const r = abs(z);
+    let s = 0;
+    for (let i = 0; i < p.length; i++) s = s * r + Math.abs(p[i]);
+    return 8 * Number.EPSILON * s;
+  }
 
   // ---- 根（Aberth 法）。末尾の 0 係数は厳密な根 0 として先に外す ----
   function roots(p) {
@@ -74,7 +82,9 @@
   // Aberth 法は k 重根を半径 ε^(1/k) 程度にばらけて返し、平均もその程度しか合わない。
   // k 重根は p^(k−1) の単根なので、平均点から Newton 法で磨いてから、
   // p, p′, …, p^(k−2) が 0 になるかを厳しく確かめる（別々の根を誤ってまとめる距離は約 1e-6）。
-  function clusterRoots(p, zs, L) {
+  // tol は重根とみなす相対誤差（既定 1e-12）。compute は追跡に失敗したときだけ広げて計算し直す。
+  function clusterRoots(p, zs, L, tol) {
+    tol = tol || 1e-12;
     const out = [];
     function group(list, rad) {
       const groups = [], used = list.map(() => false);
@@ -104,7 +114,7 @@
     function isMultiple(c, k) {
       let q = p;
       for (let j = 0; j < k - 1; j++) {
-        if (abs(evalC(q, c)) > 1e-12 * normAt(q, c)) return false;
+        if (abs(evalC(q, c)) > tol * normAt(q, c)) return false;
         q = deriv(q);
       }
       return true;
@@ -135,13 +145,13 @@
 
   const wrap = (j, N) => ((j % N) + N) % N;
 
-  function computeOnce(p, hf) {
+  function computeOnce(p, hf, mergeTol) {
     const n = p.length - 1, dp = deriv(p);
     const fr = roots(p);
     let rmax = 0;
     for (const z of fr) rmax = Math.max(rmax, abs(z));
     const L = 1 + rmax;
-    const crit = n >= 2 ? clusterRoots(dp, roots(dp), L) : [];
+    const crit = n >= 2 ? clusterRoots(dp, roots(dp), L, mergeTol) : [];
     const critPts = crit.map((c) => c.x);
     const argA = p[0] > 0 ? 0 : PI, k0 = p[0] > 0 ? 0 : 1, k0n = wrap(k0 + n, 2 * n);
     // 根をすべて含む円上では arg f が単調に 2πn 増える。半径を十分取れば、
@@ -154,7 +164,8 @@
     const verts = [];
     crit.forEach((cr, idx) => {
       const fc = evalC(p, cr.x);
-      if (!(cr.x.im === 0 || Math.abs(fc.im) <= 1e-10 * normAt(p, cr.x))) return;
+      // 非実の臨界点は Im f(c) が丸め誤差の水準のときだけ頂点（近い臨界点の対を誤認しない）
+      if (!(cr.x.im === 0 || Math.abs(fc.im) <= roundoffAt(p, cr.x))) return;
       let q = p, fact = 1;
       for (let j = 0; j <= cr.m; j++) { q = deriv(q); fact *= j + 1; }
       const K = scale(evalC(q, cr.x), 1 / fact);
@@ -170,11 +181,18 @@
       return d;
     }
     // 目標値 Re f を保ったまま Im f を 0 にする Newton 法：x ← x − i·Im f / f′
+    // 補正量が十分小さくなるか Im f が丸め誤差の水準になったら止め、そのときの補正量が
+    // 最寄りの臨界点までの距離の 0.05 倍以下なら受け入れる（f′ が小さい臨界点の近くで、
+    // 曲線から離れた点を受け入れて鞍点を素通りしないため。0.05 倍の円内では
+    // Grace–Heawood により f は単射なので、別の枝の点にはならない）。
     function newton(x) {
-      for (let it = 0; it < 12; it++) {
+      for (let it = 0; it < 20; it++) {
         const fx = evalC(p, x);
-        if (Math.abs(fx.im) <= 1e-13 * normAt(p, x)) return x;
-        x = sub(x, div(C(0, fx.im), evalC(dp, x)));
+        const s = div(C(0, fx.im), evalC(dp, x));
+        const as = abs(s);
+        if (Math.abs(fx.im) <= roundoffAt(p, x) || as <= 1e-12 * (1 + abs(x)))
+          return as <= 0.05 * distCrit(x) ? x : null;
+        x = sub(x, s);
       }
       return null;
     }
@@ -321,12 +339,16 @@
     };
   }
 
+  // 失敗したら歩幅を半分にして計算し直す。それでも失敗するのは、近接した臨界点の対を
+  // 倍精度では区別できない場合なので、重根とみなす許容誤差を広げて（退化点として）計算し直す。
   function compute(coeffs) {
     validate(coeffs);
     let res = null;
-    for (let hf = 0.1; hf >= 0.0125; hf /= 2) {
-      res = computeOnce(coeffs, hf);
-      if (res.check.ok) break;
+    for (const mergeTol of [1e-12, 1e-9, 1e-6, 1e-4]) {
+      for (let hf = 0.1; hf >= 0.0125; hf /= 2) {
+        res = computeOnce(coeffs, hf, mergeTol);
+        if (res.check.ok) return res;
+      }
     }
     return res;
   }
