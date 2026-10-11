@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>デカウス空間ビューア</title>
+<style>
+  :root { --fg: #222; --muted: #666; --line: #ccc; --panel: #f6f6f4; --warn: #b03000; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #fff; color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; font-size: 14px; }
+  #app { display: flex; height: 100%; }
+  #panel { width: 320px; flex: none; overflow-y: auto; padding: 12px 16px; background: var(--panel); border-right: 1px solid var(--line); }
+  #stage { flex: 1; position: relative; min-width: 0; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+  #formula { font-family: "Cambria Math", "Times New Roman", serif; font-size: 17px; margin: 6px 0 2px; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .row label { width: 64px; flex: none; }
+  .row input[type=number] { width: 78px; }
+  .row input[type=range] { flex: 1; min-width: 0; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  button, select { font: inherit; }
+  .checks label { display: block; margin: 2px 0; }
+  #info { font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
+  #warn { color: var(--warn); margin-top: 6px; white-space: pre-wrap; }
+  @media (max-width: 760px) {
+    #app { flex-direction: column; height: auto; }
+    #panel { width: 100%; border-right: none; border-bottom: 1px solid var(--line); }
+    #stage { flex: none; height: 75vh; } /* flex: 1 のままだと flex-basis 0 が height に勝ち、高さ 0 になる */
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>デカウス空間ビューア</h1>
+    <div id="formula"></div>
+
+    <h2>プリセット</h2>
+    <select id="preset"></select>
+
+    <h2>次数と係数</h2>
+    <div class="row"><label for="degree">次数 n</label><select id="degree"></select></div>
+    <div id="coeffs"></div>
+
+    <h2>表示</h2>
+    <div class="checks">
+      <label><input type="checkbox" id="showAxes" checked> 軸</label>
+      <label><input type="checkbox" id="showPlane" checked> ガウス平面（y = 0）</label>
+      <label><input type="checkbox" id="showRoots" checked> 解</label>
+      <label><input type="checkbox" id="showCentroid" checked> 解の重心</label>
+      <label><input type="checkbox" id="showVertices" checked> 臨界点</label>
+    </div>
+
+    <h2>視点</h2>
+    <div class="btns">
+      <button id="viewOblique">斜め</button>
+      <button id="viewTop">真上</button>
+      <button id="viewSide">真横</button>
+    </div>
+
+    <h2>表示範囲</h2>
+    <div class="row"><label for="rangeR">x 半幅 R</label><input type="number" id="rangeR" step="any" min="0"></div>
+    <div class="row"><label for="rangeY">y 範囲 ±Y</label><input type="number" id="rangeY" step="any" min="0"></div>
+    <div class="btns"><button id="rangeAuto">自動</button></div>
+
+    <h2>状態</h2>
+    <div id="info"></div>
+    <div id="warn"></div>
+  </div>
+  <div id="stage"><canvas id="cv"></canvas></div>
+</div>
+<script src="core.js"></script>
+<script src="view.js"></script>
+</body>
+</html>
