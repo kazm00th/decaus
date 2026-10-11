@@ -126,7 +126,213 @@
     return out;
   }
 
+  function validate(coeffs) {
+    if (!Array.isArray(coeffs) || coeffs.length < 2 || coeffs.length > 9)
+      throw new Error('次数は 1〜8 にしてください');
+    for (const a of coeffs) if (typeof a !== 'number' || !isFinite(a)) throw new Error('係数が数値ではありません');
+    if (coeffs[0] === 0) throw new Error('最高次の係数が 0 です');
+  }
+
+  const wrap = (j, N) => ((j % N) + N) % N;
+
+  function computeOnce(p, hf) {
+    const n = p.length - 1, dp = deriv(p);
+    const fr = roots(p);
+    let rmax = 0;
+    for (const z of fr) rmax = Math.max(rmax, abs(z));
+    const L = 1 + rmax;
+    const crit = n >= 2 ? clusterRoots(dp, roots(dp), L) : [];
+    const critPts = crit.map((c) => c.x);
+    const argA = p[0] > 0 ? 0 : PI, k0 = p[0] > 0 ? 0 : 1, k0n = wrap(k0 + n, 2 * n);
+    // 根をすべて含む円上では arg f が単調に 2πn 増える。半径を十分取れば、
+    // 漸近方向 θ_k = (kπ − arg a)/n の ±π/(2n) にちょうど1つずつ曲線が通る。
+    const Rfar = (2 / Math.sin(PI / (2 * n))) * Math.max(rmax, 1);
+    const Rexit = 1.05 * Rfar;
+    const yScale = 1 + Math.max(Math.abs(evalC(p, C(L, 0)).re), Math.abs(evalC(p, C(-L, 0)).re));
+
+    // 頂点：f(c) が実数の臨界点。局所形 f ≈ f(c) + K (x − c)^(m+1)
+    const verts = [];
+    crit.forEach((cr, idx) => {
+      const fc = evalC(p, cr.x);
+      if (!(cr.x.im === 0 || Math.abs(fc.im) <= 1e-10 * normAt(p, cr.x))) return;
+      let q = p, fact = 1;
+      for (let j = 0; j <= cr.m; j++) { q = deriv(q); fact *= j + 1; }
+      const K = scale(evalC(q, cr.x), 1 / fact);
+      const argK = K.im === 0 ? (K.re > 0 ? 0 : PI) : Math.atan2(K.im, K.re);
+      let dnear = L;
+      crit.forEach((o, i2) => { if (i2 !== idx) dnear = Math.min(dnear, abs(sub(o.x, cr.x))); });
+      verts.push({ x: cr.x, y: fc.re, m: cr.m, argK: argK, rs: 0.02 * dnear });
+    });
+
+    function distCrit(x) {
+      let d = Infinity;
+      for (const c of critPts) d = Math.min(d, abs(sub(x, c)));
+      return d;
+    }
+    // 目標値 Re f を保ったまま Im f を 0 にする Newton 法：x ← x − i·Im f / f′
+    function newton(x) {
+      for (let it = 0; it < 12; it++) {
+        const fx = evalC(p, x);
+        if (Math.abs(fx.im) <= 1e-13 * normAt(p, x)) return x;
+        x = sub(x, div(C(0, fx.im), evalC(dp, x)));
+      }
+      return null;
+    }
+
+    // 曲線上では f′·dx が実数 → 進行方向は σ·conj(f′)。σ = +1 なら y が増える向き。
+    // 歩幅は最も近い臨界点までの距離 d の hf 倍以下（Grace–Heawood により別の枝へ移らない）。
+    function trace(x, sigma, fromV) {
+      const pts = [];
+      let y = evalC(p, x).re;
+      pts.push([x.re, x.im, y]);
+      for (let step = 0; step < 200000; step++) {
+        const ax = abs(x), d1 = evalC(dp, x), ad1 = abs(d1);
+        let h = Math.min(hf * distCrit(x), ax > 3 * L ? hf * ax : 0.02 * L);
+        if (Math.abs(y) <= 10 * yScale) h = Math.min(h, 0.02 * yScale / ad1);
+        const dir = scale(conj(d1), sigma / ad1);
+        let nx = null;
+        for (let tries = 0; tries < 30 && !nx; tries++, h /= 2) {
+          const cand = newton(add(x, scale(dir, h)));
+          if (cand && sigma * (evalC(p, cand).re - y) > 0 && abs(sub(cand, x)) <= 3 * h) nx = cand;
+        }
+        if (!nx) return { fail: '曲線を追えませんでした' };
+        x = nx;
+        y = evalC(p, x).re;
+        pts.push([x.re, x.im, y]);
+        for (let v = 0; v < verts.length; v++) {
+          if (v === fromV) continue;
+          const V = verts[v], dv = sub(x, V.x);
+          if (abs(dv) >= V.rs) continue;
+          const M = V.m + 1;
+          const j = wrap(Math.round((M * Math.atan2(dv.im, dv.re) + V.argK) / PI), 2 * M);
+          // 頂点へ向かって y が増えるのは、外向きに y が減る枝（j が奇数）
+          if ((sigma === 1) !== (j % 2 === 1)) return { fail: '頂点の枝の向きが合いません' };
+          pts.push([V.x.re, V.x.im, V.y]);
+          return { pts: pts, end: 'v' + v + ':' + j };
+        }
+        if (abs(x) > Rexit) {
+          const k = wrap(Math.round((n * Math.atan2(x.im, x.re) + argA) / PI), 2 * n);
+          return { pts: pts, end: 'i' + k };
+        }
+      }
+      return { fail: '歩数の上限に達しました' };
+    }
+
+    function farStart(k) {
+      if (k === k0) return C(Rfar, 0);
+      if (k === k0n) return C(-Rfar, 0);
+      const th = (k * PI - argA) / n, w = PI / (2 * n), sgn = k % 2 === 0 ? 1 : -1;
+      const g = (t) => sgn * evalC(p, scale(expi(t), Rfar)).im;
+      let lo = th - w, hi = th + w;
+      if (!(g(lo) < 0 && g(hi) > 0)) return null;
+      for (let it = 0; it < 60; it++) {
+        const mid = (lo + hi) / 2;
+        if (g(mid) < 0) lo = mid; else hi = mid;
+      }
+      return newton(scale(expi((lo + hi) / 2), Rfar));
+    }
+
+    const arcs = [], owner = {};
+    let fail = null;
+    function addArc(a, r) {
+      if (fail) return;
+      if (r.fail) { fail = r.fail; return; }
+      if (owner[a] || owner[r.end]) { fail = '同じ端に2本の枝が来ました'; return; }
+      arcs.push({ a: a, b: r.end, pts: r.pts, real: r.pts.every((q) => q[1] === 0) });
+      owner[a] = { idx: arcs.length - 1, side: 'a' };
+      owner[r.end] = { idx: arcs.length - 1, side: 'b' };
+    }
+
+    for (let k = 0; k < 2 * n && !fail; k++) {
+      if (owner['i' + k]) continue;
+      const x0 = farStart(k);
+      if (!x0) { fail = '遠方の始点が見つかりません'; break; }
+      const d1 = evalC(dp, x0);
+      const sigma = x0.re * d1.re - x0.im * d1.im < 0 ? 1 : -1; // conj(f′) が内向きなら +1
+      addArc('i' + k, trace(x0, sigma, -1));
+    }
+    verts.forEach((V, vi) => {
+      const M = V.m + 1;
+      for (let j = 0; j < 2 * M && !fail; j++) {
+        const key = 'v' + vi + ':' + j;
+        if (owner[key]) continue;
+        let e = expi((j * PI - V.argK) / M);
+        if (V.x.im === 0 && Math.abs(e.im) < 1e-12) e = C(Math.sign(e.re), 0);
+        const x0 = newton(add(V.x, scale(e, V.rs)));
+        if (!x0) { fail = '頂点からの始点が見つかりません'; break; }
+        const r = trace(x0, j % 2 === 0 ? 1 : -1, vi);
+        if (r.pts) r.pts.unshift([V.x.re, V.x.im, V.y]);
+        addArc(key, r);
+      }
+    });
+
+    // 頂点では向かい合う枝（j と j+M）をつなぐ＝通り抜けの規則
+    const strands = [];
+    if (!fail) {
+      const used = arcs.map(() => false);
+      for (let k = 0; k < 2 * n && !fail; k++) {
+        if (used[owner['i' + k].idx]) continue;
+        let cur = 'i' + k, pts = [], real = true;
+        for (;;) {
+          const o = owner[cur];
+          if (!o) { fail = '枝 ' + cur + ' がありません'; break; }
+          if (used[o.idx]) { fail = '同じ枝を2度通りました'; break; }
+          used[o.idx] = true;
+          const arc = arcs[o.idx];
+          let seq = o.side === 'a' ? arc.pts : arc.pts.slice().reverse();
+          if (pts.length) seq = seq.slice(1);
+          pts = pts.concat(seq);
+          real = real && arc.real;
+          const other = o.side === 'a' ? arc.b : arc.a;
+          if (other[0] === 'i') {
+            strands.push({ real: real, colorIndex: null, ends: [k, +other.slice(1)], points: pts });
+            break;
+          }
+          const [vi, j] = other.slice(1).split(':').map(Number), M = verts[vi].m + 1;
+          cur = 'v' + vi + ':' + ((j + M) % (2 * M));
+        }
+      }
+      if (!fail && used.some((u) => !u)) fail = '使われない枝があります';
+    }
+
+    if (!fail) {
+      const cnt = new Array(2 * n).fill(0);
+      for (const s of strands) { cnt[s.ends[0]]++; cnt[s.ends[1]]++; }
+      const reals = strands.filter((s) => s.real);
+      if (cnt.some((c) => c !== 1)) fail = '漸近方向ごとの端の数が 1 ではありません';
+      else if (reals.length !== 1) fail = '実曲線が 1 本ではありません';
+      else {
+        const e = reals[0].ends.slice().sort((a, b) => a - b);
+        if (e[0] !== Math.min(k0, k0n) || e[1] !== Math.max(k0, k0n)) fail = '実曲線の端が実軸上にありません';
+      }
+    }
+
+    strands.filter((s) => !s.real)
+      .sort((a, b) => Math.min(a.ends[0], a.ends[1]) - Math.min(b.ends[0], b.ends[1]))
+      .forEach((s, i) => { s.colorIndex = i; });
+
+    return {
+      strands: strands,
+      roots: fr,
+      centroid: -p[1] / (n * p[0]),
+      vertices: verts.map((V) => ({ x: V.x, y: V.y, m: V.m })),
+      degenerate: verts.some((V) => V.m >= 2 || V.x.im !== 0),
+      check: { ok: !fail, message: fail || '' },
+    };
+  }
+
+  function compute(coeffs) {
+    validate(coeffs);
+    let res = null;
+    for (let hf = 0.1; hf >= 0.0125; hf /= 2) {
+      res = computeOnce(coeffs, hf);
+      if (res.check.ok) break;
+    }
+    return res;
+  }
+
   const Decaus = {
+    compute: compute,
     _internal: { C: C, evalC: evalC, deriv: deriv, normAt: normAt, roots: roots, clusterRoots: clusterRoots },
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Decaus;
