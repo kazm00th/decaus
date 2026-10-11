@@ -16,7 +16,9 @@
 
 ## テスト
 
-    D:\node-v24.20.0-win-x64\node.exe --test tests/core.test.js
+Node.js 18 以上で実行します（依存パッケージなし）。
+
+    node --test tests/core.test.js
 
 ## 文書
 
