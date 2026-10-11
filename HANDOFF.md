@@ -5,7 +5,9 @@
 ## 現状（2026-10-11）
 
 - 第1版の実装が完了（core.js・view.js・index.html、テスト 26 件）。
-- ブランチ `feat/viewer` を main へ `--no-ff` でマージ。push しない。
+- ブランチ `feat/viewer` を main へ `--no-ff` でマージ済み。
+- GitHub で公開（2026-10-11）：https://github.com/kazm00th/decaus （public）、
+  GitHub Pages：https://kazm00th.github.io/decaus/ （main の / から配信）。以後は main を push すると Pages に反映される。
 
 ## 決定事項
 
