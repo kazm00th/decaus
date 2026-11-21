@@ -237,6 +237,20 @@ test('原点で臨界点どうしの距離が 4e-6〜4e-2 でも計算が通り�
   }
 });
 
+test('f(c) が実数とほぼ区別できない複素臨界点は退化点（頂点）として扱い、計算は通る', () => {
+  // 8次式で a6 = −0.437675546356… のとき c ≈ −0.516 ± 0.197i で Im f(c) = 0 になる。
+  // 12 桁で打ち込むと Im f(c) は 1e-14 程度残り、曲線は 1e-7 程度しか離れない。
+  const P = (a6) => [1, 0, a6, 0.04, -0.13, 0, 0.4, 0.3, 0];
+  const r = D.compute(P(-0.437675546356));
+  assert.ok(r.check.ok, r.check.message);
+  assert.equal(r.degenerate, true);
+  assert.equal(r.vertices.filter((v) => v.x.im !== 0).length, 2);
+  assert.deepEqual(imagEnds(r), [[1, 2], [3, 4], [5, 7], [6, 10], [9, 11], [12, 13], [14, 15]]);
+  // 退化点の前後は一般の場合のつながり方
+  assert.deepEqual(imagEnds(D.compute(P(-0.437676))), [[1, 2], [3, 4], [5, 6], [7, 9], [10, 11], [12, 13], [14, 15]]);
+  assert.deepEqual(imagEnds(D.compute(P(-0.437675))), [[1, 2], [3, 4], [5, 11], [6, 7], [9, 10], [12, 13], [14, 15]]);
+});
+
 test('x = 3 へ平行移動すると精度の限界で区別できない対は退化点として扱い、計算は通る', () => {
   for (let e = -11; e <= -3; e += 0.5) {
     const eps = Math.pow(10, e);
