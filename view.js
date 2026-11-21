@@ -241,7 +241,7 @@
       const lab = document.createElement('label');
       lab.textContent = 'a' + k + (k === 0 ? '' : k === 1 ? '  x' : '  x' + SUP[k]);
       const num = document.createElement('input');
-      num.type = 'number'; num.step = 'any'; num.value = a;
+      num.type = 'number'; num.step = 0.01; num.value = a; // 上下ボタンの刻み。打ち込みは任意の値でよい
       const rng = document.createElement('input');
       rng.type = 'range'; rng.min = -5; rng.max = 5; rng.step = 0.01; rng.value = a;
       // 最高次の係数が 0 なら欄の背景を赤くする
