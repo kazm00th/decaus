@@ -130,9 +130,10 @@
     const A = proj(a), B = proj(b);
     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
   }
-  function label(q, text) {
+  // dy は文字の位置の縦のずらし（既定は点の右上）
+  function label(q, text, dy) {
     const P = proj(q);
-    ctx.fillText(text, P[0] + 4, P[1] - 4);
+    ctx.fillText(text, P[0] + 4, P[1] + (dy === undefined ? -4 : dy));
   }
 
   // ---- 描画 ----
@@ -185,7 +186,8 @@
           ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
           line3([u, 0, -1], [u, 0, 1]);
           ctx.setLineDash([]);
-          ctx.fillStyle = '#555'; label([u, 0, 1], '重心');
+          // 上端は Y 軸のラベルと重なるので、線の下端の右下に書く
+          ctx.fillStyle = '#555'; label([u, 0, -1], '重心', 14);
         }
       }
       if ($('showRoots').checked) {
