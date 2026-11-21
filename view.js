@@ -255,6 +255,10 @@
         const v = parseFloat(rng.value);
         state.coeffs[i] = v; num.value = v; mark(); recompute();
       });
+      // スライダーをダブルクリックすると 0 に戻す
+      rng.addEventListener('dblclick', () => {
+        rng.value = 0; state.coeffs[i] = 0; num.value = 0; mark(); recompute();
+      });
       mark();
       row.append(lab, num, rng);
       box.append(row);
