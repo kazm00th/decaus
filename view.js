@@ -12,7 +12,11 @@
     { name: '4次・極値3つ', c: [1, 0, -2, 0, 0] },
     { name: '4次・極値＋変曲点', c: [1, 4 / 3, 0, 0, 0] },
   ];
-  const VIEWS = { oblique: { az: -0.55, el: 0.42 }, top: { az: 0, el: PI / 2 }, side: { az: 0, el: 0 } };
+  // side：横軸 Xr・縦軸 y、sideXi：横軸 Xi・縦軸 y（鉛直軸まわりに 90° 回す）
+  const VIEWS = {
+    oblique: { az: -0.55, el: 0.42 }, top: { az: 0, el: PI / 2 },
+    side: { az: 0, el: 0 }, sideXi: { az: PI / 2, el: 0 },
+  };
   const SUP = '⁰¹²³⁴⁵⁶⁷⁸';
 
   const state = {
@@ -287,6 +291,7 @@
     $('viewOblique').addEventListener('click', () => setView(VIEWS.oblique));
     $('viewTop').addEventListener('click', () => setView(VIEWS.top));
     $('viewSide').addEventListener('click', () => setView(VIEWS.side));
+    $('viewSideXi').addEventListener('click', () => setView(VIEWS.sideXi));
     for (const id of ['rangeR', 'rangeY']) {
       $(id).addEventListener('input', () => {
         const v = parseFloat($(id).value);
