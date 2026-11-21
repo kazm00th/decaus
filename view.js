@@ -244,15 +244,18 @@
       num.type = 'number'; num.step = 'any'; num.value = a;
       const rng = document.createElement('input');
       rng.type = 'range'; rng.min = -5; rng.max = 5; rng.step = 0.01; rng.value = a;
+      // 最高次の係数が 0 なら欄の背景を赤くする
+      const mark = () => { if (i === 0) num.classList.toggle('invalid', state.coeffs[0] === 0); };
       num.addEventListener('input', () => {
         const v = parseFloat(num.value);
         if (!isFinite(v)) return;
-        state.coeffs[i] = v; rng.value = v; recompute();
+        state.coeffs[i] = v; rng.value = v; mark(); recompute();
       });
       rng.addEventListener('input', () => {
         const v = parseFloat(rng.value);
-        state.coeffs[i] = v; num.value = v; recompute();
+        state.coeffs[i] = v; num.value = v; mark(); recompute();
       });
+      mark();
       row.append(lab, num, rng);
       box.append(row);
     });
