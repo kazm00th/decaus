@@ -145,7 +145,7 @@
 
   const wrap = (j, N) => ((j % N) + N) % N;
 
-  function computeOnce(p, hf, mergeTol) {
+  function computeOnce(p, hf, mergeTol, vertexTol) {
     const n = p.length - 1, dp = deriv(p);
     const fr = roots(p);
     let rmax = 0;
@@ -164,8 +164,9 @@
     const verts = [];
     crit.forEach((cr, idx) => {
       const fc = evalC(p, cr.x);
-      // 非実の臨界点は Im f(c) が丸め誤差の水準のときだけ頂点（近い臨界点の対を誤認しない）
-      if (!(cr.x.im === 0 || Math.abs(fc.im) <= roundoffAt(p, cr.x))) return;
+      // 非実の臨界点は Im f(c) が丸め誤差の水準（の vertexTol 倍）のときだけ頂点
+      //（近い臨界点の対を誤認しない。vertexTol は追跡に失敗したときだけ 1 より大きくする）
+      if (!(cr.x.im === 0 || Math.abs(fc.im) <= vertexTol * roundoffAt(p, cr.x))) return;
       let q = p, fact = 1;
       for (let j = 0; j <= cr.m; j++) { q = deriv(q); fact *= j + 1; }
       const K = scale(evalC(q, cr.x), 1 / fact);
@@ -339,14 +340,17 @@
     };
   }
 
-  // 失敗したら歩幅を半分にして計算し直す。それでも失敗するのは、近接した臨界点の対を
-  // 倍精度では区別できない場合なので、重根とみなす許容誤差を広げて（退化点として）計算し直す。
+  // 失敗したら歩幅を半分にして計算し直す。それでも失敗するのは、倍精度では区別できない
+  // 退化の直前（近接した臨界点の対、または f(c) がほぼ実数の複素臨界点）なので、
+  // 重根とみなす許容誤差と、頂点とみなす Im f(c) の許容誤差（丸め誤差の何倍か）を
+  // 段階的に広げて（退化点として）計算し直す。
+  const FALLBACK = [[1e-12, 1], [1e-9, 1e3], [1e-6, 1e6], [1e-4, 1e9]];
   function compute(coeffs) {
     validate(coeffs);
     let res = null;
-    for (const mergeTol of [1e-12, 1e-9, 1e-6, 1e-4]) {
+    for (const [mergeTol, vertexTol] of FALLBACK) {
       for (let hf = 0.1; hf >= 0.0125; hf /= 2) {
-        res = computeOnce(coeffs, hf, mergeTol);
+        res = computeOnce(coeffs, hf, mergeTol, vertexTol);
         if (res.check.ok) return res;
       }
     }
