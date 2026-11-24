@@ -145,6 +145,43 @@ test('x⁴ + (4/3)x³：停留変曲点で通り抜け', () => {
   assert.deepEqual(imagEnds(r), [[1, 6], [2, 7], [3, 5]]);
 });
 
+// 実曲線上の極値と変曲点（x の昇順）
+const ext = (r) => r.extrema.map((e) => [+e.x.toFixed(9), +e.y.toFixed(9), e.kind]);
+const inf = (r) => r.inflections.map((e) => [+e.x.toFixed(9), +e.y.toFixed(9)]);
+
+test('極値と変曲点：x³ − 3x は極大 (−1, 2)・極小 (1, −2)、変曲点 (0, 0)', () => {
+  const r = D.compute([1, 0, -3, 0]);
+  assert.deepEqual(ext(r), [[-1, 2, 'max'], [1, -2, 'min']]);
+  assert.deepEqual(inf(r), [[0, 0]]);
+});
+
+test('極値と変曲点：x³ は極値なし、原点は停留変曲点', () => {
+  const r = D.compute([1, 0, 0, 0]);
+  assert.deepEqual(ext(r), []);
+  assert.deepEqual(inf(r), [[0, 0]]);
+});
+
+test('極値と変曲点：x⁴ は原点で極小、f″ = 12x² は符号を変えないので変曲点なし', () => {
+  const r = D.compute([1, 0, 0, 0, 0]);
+  assert.deepEqual(ext(r), [[0, 0, 'min']]);
+  assert.deepEqual(inf(r), []);
+});
+
+test('極値と変曲点：x⁴ + (4/3)x³ は極小 x = −1、変曲点 x = −2/3 と 0（停留）', () => {
+  const r = D.compute([1, 4 / 3, 0, 0, 0]);
+  assert.deepEqual(ext(r), [[-1, -1 / 3 + 0, 'min'].map((v) => (typeof v === 'number' ? +v.toFixed(9) : v))]);
+  const f = (x) => x ** 4 + (4 / 3) * x ** 3;
+  assert.deepEqual(inf(r), [[+(-2 / 3).toFixed(9), +f(-2 / 3).toFixed(9)], [0, 0]]);
+});
+
+test('極値と変曲点：−x² + 1 は極大、1次式はどちらもなし', () => {
+  assert.deepEqual(ext(D.compute([-1, 0, 1])), [[0, 1, 'max']]);
+  assert.deepEqual(inf(D.compute([-1, 0, 1])), []);
+  const r = D.compute([2, 1]);
+  assert.deepEqual(ext(r), []);
+  assert.deepEqual(inf(r), []);
+});
+
 test('解の重心は −b/(a·n) で、解の平均に等しい', () => {
   const r = D.compute([2, 3, 0, 1]);
   assert.ok(near(r.centroid, -0.5, 1e-15));

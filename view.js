@@ -208,6 +208,28 @@
           ctx.beginPath(); ctx.arc(P[0], P[1], 5, 0, 2 * PI); ctx.fill(); ctx.stroke();
         }
       }
+      // 実曲線上の極値（▲ 極大・▼ 極小、塗り）と変曲点（◇、中抜き）。画面上の位置に描く
+      const marker = (x, y, path) => {
+        const q = norm([x, 0, y]);
+        if (q.some((t) => Math.abs(t) > 1)) return;
+        const P = proj(q);
+        ctx.beginPath(); path(P[0], P[1]); ctx.closePath();
+      };
+      if ($('showExtrema').checked) {
+        ctx.fillStyle = '#111';
+        for (const e of r.extrema) {
+          const s = e.kind === 'max' ? -1 : 1; // 画面の y は下向き
+          marker(e.x, e.y, (X, Y) => { ctx.moveTo(X, Y + 8 * s); ctx.lineTo(X - 7, Y - 5 * s); ctx.lineTo(X + 7, Y - 5 * s); });
+          ctx.fill();
+        }
+      }
+      if ($('showInflections').checked) {
+        ctx.strokeStyle = '#111'; ctx.fillStyle = '#fff'; ctx.lineWidth = 1.5;
+        for (const e of r.inflections) {
+          marker(e.x, e.y, (X, Y) => { ctx.moveTo(X, Y - 7); ctx.lineTo(X + 7, Y); ctx.lineTo(X, Y + 7); ctx.lineTo(X - 7, Y); });
+          ctx.fill(); ctx.stroke();
+        }
+      }
     }
   }
 
@@ -220,6 +242,12 @@
       info += '解の重心  ' + fmt(r.centroid) + '\n';
       info += '臨界点（頂点）\n' + (r.vertices.length
         ? r.vertices.map((v) => '  x = ' + fmtC(v.x) + ', y = ' + fmt(v.y) + (v.m > 1 ? '（' + (v.m + 1) + '重の交差）' : '')).join('\n')
+        : '  なし') + '\n';
+      info += '極値\n' + (r.extrema.length
+        ? r.extrema.map((e) => '  ' + (e.kind === 'max' ? '極大' : '極小') + ' x = ' + fmt(e.x) + ', y = ' + fmt(e.y)).join('\n')
+        : '  なし') + '\n';
+      info += '変曲点\n' + (r.inflections.length
+        ? r.inflections.map((e) => '  x = ' + fmt(e.x) + ', y = ' + fmt(e.y)).join('\n')
         : '  なし');
     }
     $('info').textContent = info;
@@ -295,7 +323,7 @@
       o.value = n; o.textContent = n; $('degree').append(o);
     }
     $('degree').addEventListener('change', () => setDegree(+$('degree').value));
-    ['showAxes', 'showPlane', 'showRoots', 'showCentroid', 'showVertices']
+    ['showAxes', 'showPlane', 'showRoots', 'showCentroid', 'showVertices', 'showExtrema', 'showInflections']
       .forEach((id) => $(id).addEventListener('change', requestDraw));
     $('viewOblique').addEventListener('click', () => setView(VIEWS.oblique));
     $('viewTop').addEventListener('click', () => setView(VIEWS.top));

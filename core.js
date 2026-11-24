@@ -145,6 +145,31 @@
 
   const wrap = (j, N) => ((j % N) + N) % N;
 
+  // ---- 実曲線上の極値と変曲点（x の昇順）----
+  // 極値：f′ の実の零点のうち重複度 m が奇数のもの。f^(m+1)(c) > 0 なら極小、< 0 なら極大。
+  // （m が偶数なら f′ は符号を変えず、停留変曲点になる）
+  function realExtrema(p, crit) {
+    const out = [];
+    for (const cr of crit) {
+      if (cr.x.im !== 0 || cr.m % 2 === 0) continue;
+      let q = p;
+      for (let j = 0; j <= cr.m; j++) q = deriv(q);
+      out.push({ x: cr.x.re, y: evalC(p, cr.x).re, kind: evalC(q, cr.x).re > 0 ? 'min' : 'max' });
+    }
+    return out.sort((a, b) => a.x - b.x);
+  }
+  // 変曲点：f″ の実の零点のうち重複度が奇数（f″ が符号を変える）もの
+  function realInflections(p, L) {
+    if (p.length < 4) return []; // 2次以下は f″ が定数
+    const d2 = deriv(deriv(p));
+    const out = [];
+    for (const r of clusterRoots(d2, roots(d2), L)) {
+      if (r.x.im !== 0 || r.m % 2 === 0) continue;
+      out.push({ x: r.x.re, y: evalC(p, r.x).re });
+    }
+    return out.sort((a, b) => a.x - b.x);
+  }
+
   function computeOnce(p, hf, mergeTol, vertexTol) {
     const n = p.length - 1, dp = deriv(p);
     const fr = roots(p);
@@ -335,6 +360,8 @@
       roots: fr,
       centroid: -p[1] / (n * p[0]),
       vertices: verts.map((V) => ({ x: V.x, y: V.y, m: V.m })),
+      extrema: realExtrema(p, crit),
+      inflections: realInflections(p, L),
       degenerate: verts.some((V) => V.m >= 2 || V.x.im !== 0),
       check: { ok: !fail, message: fail || '' },
     };
